@@ -1,0 +1,32 @@
+version: '3.8'
+services:
+  auto_nessus:
+    build: ./auto_nessus_service
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+  nmapscanner:
+    build: ./nmapscanner_service
+    ports:
+      - "8001:8001"
+    env_file:
+      - ../.env
+  nmapall:
+    build: ./nmapall_service
+    ports:
+      - "8002:8002"
+    env_file:
+      - ../.env
+  osscan:
+    build: ./osscan_service
+    ports:
+      - "8003:8003"
+    env_file:
+      - ../.env
+  portxmlparser:
+    build: ./portxmlparser_service
+    ports:
+      - "8004:8004"
+    env_file:
+      - ../.env
