@@ -17,11 +17,23 @@ import shlex
 import signal
 import time
 from typing import Optional
+# =Juggernaut= Added imports for timestamped folder creation
+import datetime
+import pathlib
 
 app = FastAPI(title="NmapAll Microservice")
 
 # Load environment variables
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
+
+# =Juggernaut= Added function to create timestamped result folders
+def create_scan_folder(ip: str) -> str:
+    """Create a timestamped folder for scan results."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    folder_name = f"nmapall_{ip}_{timestamp}"
+    scan_folder = os.path.join("/app/scan_results", folder_name)
+    pathlib.Path(scan_folder).mkdir(parents=True, exist_ok=True)
+    return scan_folder
 
 @app.get("/status")
 def status():
@@ -49,6 +61,9 @@ def scan_all(ip: str = Query(..., description="Target IP address"),
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid IP address format")
     
+    # =Juggernaut= Create timestamped folder for this scan
+    scan_folder = create_scan_folder(ip)
+    
     # Fail-safe: Check if script directory exists
     if not os.path.isdir(script_dir):
         raise HTTPException(status_code=500, detail=f"Nmap script directory not found: {script_dir}")
@@ -61,41 +76,50 @@ def scan_all(ip: str = Query(..., description="Target IP address"),
             script_files = script_files[:max_scripts]
             results.append({
                 "warning": f"Limited to {max_scripts} scripts out of {len(script_files)} available",
-                "scripts_used": script_files
+                "scripts_used": script_files,
+                "scan_folder": scan_folder  # =Juggernaut= Added scan folder info
             })
+        
+        for script_file in script_files:
+            # =Juggernaut= Create output file in scan folder
+            output_file = os.path.join(scan_folder, f"{script_file.replace('.nse', '')}_output.txt")
             
+            # Fail-safe: Use simpler nmap command to avoid hanging
+            cmd = f"nmap -sS -T4 --max-retries 1 --host-timeout 30s --script {script_file} {ip}"
+            args = shlex.split(cmd)
+            
+            try:
+                # Fail-safe: Set process timeout to prevent hanging
+                result = subprocess.run(args, 
+                                      capture_output=True, 
+                                      text=True, 
+                                      timeout=timeout//len(script_files),  # Distribute timeout across scripts
+                                      check=False)
+                
+                # =Juggernaut= Save output to file
+                with open(output_file, 'w') as f:
+                    f.write(result.stdout)
+                
+                if result.returncode == 0:
+                    results.append({"script": script_file, "output": result.stdout, "output_file": output_file})
+                else:
+                    results.append({"script": script_file, "error": result.stderr or "Script failed", "output_file": output_file})
+                    
+            except subprocess.TimeoutExpired:
+                results.append({"script": script_file, "error": "Script timed out", "output_file": output_file})
+            except Exception as e:
+                results.append({"script": script_file, "error": str(e), "output_file": output_file})
+    
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not list Nmap scripts: {e}")
-    
-    for script in script_files:
-        # Fail-safe: Use simpler nmap command to avoid hanging
-        cmd = f"nmap -sS -T4 --max-retries 1 --host-timeout 30s --script {script} {ip}"
-        args = shlex.split(cmd)
-        
-        try:
-            # Fail-safe: Set process timeout to prevent hanging
-            result = subprocess.run(args, 
-                                  capture_output=True, 
-                                  text=True, 
-                                  timeout=timeout//len(script_files),  # Distribute timeout across scripts
-                                  check=False)
-            
-            if result.returncode == 0:
-                results.append({"script": script, "output": result.stdout})
-            else:
-                results.append({"script": script, "error": result.stderr or "Script failed"})
-                
-        except subprocess.TimeoutExpired:
-            results.append({"script": script, "error": "Script timed out"})
-        except Exception as e:
-            results.append({"script": script, "error": str(e)})
     
     return {
         "target_ip": ip,
         "total_scripts": len(script_files),
         "results": results,
         "timeout_used": timeout,
-        "max_scripts_limit": max_scripts
+        "max_scripts_limit": max_scripts,
+        "scan_folder": scan_folder  # =Juggernaut= Added scan folder info
     }
 
 # ---

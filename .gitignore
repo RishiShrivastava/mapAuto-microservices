@@ -127,3 +127,51 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+/home/kali/Documents/mapauto/mapAuto-microservices/README.md
+/home/kali/Documents/mapauto/mapAuto-microservices/mapauto-microservices/scan_results
+
+# =Juggernaut= Custom additions for mapAuto microservices
+# Health check script (contains runtime logic)
+**/health_check.py
+
+# Scan results directory (contains scan output data)
+scan_results/
+**/scan_results/
+/home/kali/Documents/mapauto/mapAuto-microservices/mapauto-microservices/scan_results/
+mapauto-microservices/scan_results/
+
+# Health check requirements
+**/requirements-healthcheck.txt
+
+# Docker volumes and build artifacts
+.dockerignore
+docker-compose.override.yml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# Log files
+*.log
+logs/
+
+# Runtime files
+*.pid
+*.sock

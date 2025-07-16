@@ -13,11 +13,24 @@ from fastapi import FastAPI, Query, HTTPException
 import os
 from dotenv import load_dotenv
 import xml.etree.ElementTree as ET
+# =Juggernaut= Added imports for timestamped folder creation
+import datetime
+import pathlib
+import shutil
 
 app = FastAPI(title="PortXmlParser Microservice")
 
 # Load environment variables
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
+
+# =Juggernaut= Added function to create timestamped result folders
+def create_parse_folder() -> str:
+    """Create a timestamped folder for parsing results."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    folder_name = f"xmlparser_{timestamp}"
+    parse_folder = os.path.join("/app/scan_results", folder_name)
+    pathlib.Path(parse_folder).mkdir(parents=True, exist_ok=True)
+    return parse_folder
 
 @app.get("/status")
 def status():
@@ -32,6 +45,9 @@ def parse_xml(xml_path: str = Query(..., description="Path to Nmap XML file")):
     Includes fail-safes: file validation, error handling, and resource limits.
     """
     try:
+        # =Juggernaut= Create timestamped folder for parsing results
+        parse_folder = create_parse_folder()
+        
         # Fail-safe: Validate file path
         if not xml_path or xml_path.strip() == "":
             raise HTTPException(status_code=400, detail="XML file path cannot be empty")
@@ -42,6 +58,11 @@ def parse_xml(xml_path: str = Query(..., description="Path to Nmap XML file")):
         
         if not os.access(xml_path, os.R_OK):
             raise HTTPException(status_code=403, detail="XML file is not readable")
+        
+        # =Juggernaut= Copy XML file to parse folder for archival
+        xml_filename = os.path.basename(xml_path)
+        archived_xml = os.path.join(parse_folder, xml_filename)
+        shutil.copy2(xml_path, archived_xml)
         
         # Fail-safe: Check file size to prevent parsing huge files
         file_size = os.path.getsize(xml_path)
@@ -102,7 +123,9 @@ def parse_xml(xml_path: str = Query(..., description="Path to Nmap XML file")):
             "total_tcp_ports": len(open_tcp_ports),
             "total_udp_ports": len(open_udp_ports),
             "parsed_ports": parsed_ports,
-            "file_size_bytes": file_size
+            "file_size_bytes": file_size,
+            "parse_folder": parse_folder,  # =Juggernaut= - Added folder info
+            "archived_xml": archived_xml   # =Juggernaut= - Added archive info
         }
         
         # Fail-safe: Add warning if port limit was reached

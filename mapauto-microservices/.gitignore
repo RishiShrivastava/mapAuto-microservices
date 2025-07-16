@@ -1,0 +1,64 @@
+# =Juggernaut= .gitignore for mapAuto microservices directory
+
+# Documentation files (local modifications)
+README.md
+../README.md
+
+# Health check script and dependencies
+health_check.py
+requirements-healthcheck.txt
+
+# Scan results directory
+scan_results/
+**/scan_results/
+/home/kali/Documents/mapauto/mapAuto-microservices/mapauto-microservices/scan_results/
+./scan_results/
+
+# Docker runtime files
+.dockerignore
+docker-compose.override.yml
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Runtime files
+*.pid
+*.sock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Coverage reports
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/

@@ -16,11 +16,23 @@ import subprocess
 import shlex
 import ipaddress
 from typing import Optional
+# =Juggernaut= Added imports for timestamped folder creation
+import datetime
+import pathlib
 
 app = FastAPI(title="OSScan Microservice")
 
 # Load environment variables
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
+
+# =Juggernaut= Added function to create timestamped result folders
+def create_scan_folder(ip: str) -> str:
+    """Create a timestamped folder for scan results."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    folder_name = f"osscan_{ip}_{timestamp}"
+    scan_folder = os.path.join("/app/scan_results", folder_name)
+    pathlib.Path(scan_folder).mkdir(parents=True, exist_ok=True)
+    return scan_folder
 
 @app.get("/status")
 def status():
@@ -44,7 +56,9 @@ def os_scan(ip: str = Query(..., description="Target IP address"),
         raise HTTPException(status_code=400, detail="Invalid IP address format")
     
     try:
-        oscanxmlfile = f"/tmp/OSScan_{ip}.xml"
+        # =Juggernaut= Create timestamped folder for this scan
+        scan_folder = create_scan_folder(ip)
+        oscanxmlfile = os.path.join(scan_folder, f"OSScan_{ip}.xml")
         
         # Fail-safe: Use safer nmap options to prevent hanging
         osscancmd = f"nmap -T4 --max-retries 1 --host-timeout 60s -O --osscan-guess -oX {oscanxmlfile} {ip}"
@@ -61,6 +75,7 @@ def os_scan(ip: str = Query(..., description="Target IP address"),
                     "command": osscancmd,
                     "output": result.stdout,
                     "os_scan_xml": oscanxmlfile if file_exists else None,
+                    "scan_folder": scan_folder,  # =Juggernaut= Added scan folder info
                     "message": f"OSScan completed successfully. Result at: {oscanxmlfile}" if file_exists else "OSScan completed but XML file not found",
                     "timeout_used": timeout
                 }

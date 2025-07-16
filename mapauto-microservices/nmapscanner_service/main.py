@@ -20,12 +20,24 @@ import time
 from collections import defaultdict
 from typing import Optional
 import ipaddress
+# =Juggernaut= Added imports for timestamped folder creation
+import datetime
+import pathlib
 
 
 app = FastAPI(title="NmapScanner Microservice")
 
 # Load environment variables
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
+
+# =Juggernaut= Added function to create timestamped result folders
+def create_scan_folder(ip: str) -> str:
+    """Create a timestamped folder for scan results."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    folder_name = f"nmapscanner_{ip}_{timestamp}"
+    scan_folder = os.path.join("/app/scan_results", folder_name)
+    pathlib.Path(scan_folder).mkdir(parents=True, exist_ok=True)
+    return scan_folder
 
 @app.get("/status")
 def status():
@@ -69,12 +81,17 @@ def scan(ip: str = Query(..., description="Target IP address"),
         "port_scripts": {},
         "script_results": {},
         "errors": [],
-        "timeout_used": timeout
+        "timeout_used": timeout,
+        "scan_folder": None  # =Juggernaut= Added scan folder info
     }
     
     try:
+        # =Juggernaut= Create timestamped folder for this scan
+        scan_folder = create_scan_folder(ip)
+        results["scan_folder"] = scan_folder
+        
         # 1. Run OS scan with fail-safes
-        oscanxmlfile = f"/tmp/OSScan_{ip}.xml"
+        oscanxmlfile = os.path.join(scan_folder, f"OSScan_{ip}.xml")
         osscancmd = f"nmap -T4 --max-retries 1 --host-timeout 60s -O --osscan-guess -oX {oscanxmlfile} {ip}"
         args = shlex.split(osscancmd)
         try:
@@ -92,7 +109,7 @@ def scan(ip: str = Query(..., description="Target IP address"),
             results["os_scan"] = None
 
         # 2. Run WAF port scan with fail-safes
-        portscanfile = f"/tmp/WAFPortScan_{ip}.xml"
+        portscanfile = os.path.join(scan_folder, f"WAFPortScan_{ip}.xml")
         portcmd = f"nmap -T4 --max-retries 1 --host-timeout 60s -sS --top-ports 1000 --script http-waf-detect -oX {portscanfile} {ip}"
         args = shlex.split(portcmd)
         try:

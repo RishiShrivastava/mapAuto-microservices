@@ -1,4 +1,4 @@
-version: '3.8'
+# =Juggernaut= Updated docker-compose.yml for persistence and restart policies
 services:
   auto_nessus:
     build: ./auto_nessus_service
@@ -6,27 +6,88 @@ services:
       - "8000:8000"
     env_file:
       - ../.env
+    # =Juggernaut= Added restart policy and volume for persistence
+    restart: unless-stopped
+    volumes:
+      - ./scan_results:/app/scan_results
+      - nessus_data:/app/data
+    # =Juggernaut= Added health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
   nmapscanner:
     build: ./nmapscanner_service
     ports:
       - "8001:8001"
     env_file:
       - ../.env
+    # =Juggernaut= Added restart policy and volume for persistence
+    restart: unless-stopped
+    volumes:
+      - ./scan_results:/app/scan_results
+    # =Juggernaut= Added health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
   nmapall:
     build: ./nmapall_service
     ports:
       - "8002:8002"
     env_file:
       - ../.env
+    # =Juggernaut= Added restart policy and volume for persistence
+    restart: unless-stopped
+    volumes:
+      - ./scan_results:/app/scan_results
+    # =Juggernaut= Added health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
   osscan:
     build: ./osscan_service
     ports:
       - "8003:8003"
     env_file:
       - ../.env
+    # =Juggernaut= Added restart policy and volume for persistence
+    restart: unless-stopped
+    volumes:
+      - ./scan_results:/app/scan_results
+    # =Juggernaut= Added health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
   portxmlparser:
     build: ./portxmlparser_service
     ports:
       - "8004:8004"
     env_file:
       - ../.env
+    # =Juggernaut= Added restart policy and volume for persistence
+    restart: unless-stopped
+    volumes:
+      - ./scan_results:/app/scan_results
+    # =Juggernaut= Added health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# =Juggernaut= Added named volumes for data persistence
+volumes:
+  nessus_data:
+    driver: local

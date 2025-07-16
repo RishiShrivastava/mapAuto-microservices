@@ -87,12 +87,20 @@ def launch(sid):
 
 # --- FastAPI Endpoints ---
 
+# =Juggernaut= Modified to handle Nessus connection failure gracefully
 @app.on_event("startup")
 def startup_event():
     """Login to Nessus on startup and store the token."""
     if 'xxxxx' in [NESSUS_USERNAME, NESSUS_PASSWORD]:
-        raise RuntimeError("Please set NESSUS_USERNAME and NESSUS_PASSWORD in your .env file.")
-    login()
+        print("Warning: Please set NESSUS_USERNAME and NESSUS_PASSWORD in your .env file.")
+        return
+    try:
+        login()
+        print("Successfully connected to Nessus")
+    except Exception as e:
+        print(f"Warning: Could not connect to Nessus: {e}")
+        print("Service will start but Nessus functionality will be limited")
+        # =Juggernaut= Service continues to run even if Nessus is not available
 
 @app.get("/status")
 def status():
@@ -101,6 +109,10 @@ def status():
 @app.get("/scans")
 def list_scans():
     """List all scans with their status and IDs."""
+    # =Juggernaut= Added check for Nessus connection
+    if token is None:
+        raise HTTPException(status_code=503, detail="Nessus service not available. Please check connection.")
+    
     status_dict, name_dict = get_scans()
     scans = []
     for scan_id in status_dict:
@@ -114,12 +126,20 @@ def list_scans():
 @app.get("/policies")
 def list_policies():
     """List all scan policies."""
+    # =Juggernaut= Added check for Nessus connection
+    if token is None:
+        raise HTTPException(status_code=503, detail="Nessus service not available. Please check connection.")
+    
     policies = get_policies()
     return {"policies": policies}
 
 @app.post("/scans/start")
 def start_scan(scan_id: str = Query(..., description="Scan ID to start")):
     """Start a specified scan by scan ID."""
+    # =Juggernaut= Added check for Nessus connection
+    if token is None:
+        raise HTTPException(status_code=503, detail="Nessus service not available. Please check connection.")
+    
     scan_uuid = launch(scan_id)
     return {"message": f"Scan {scan_id} started.", "scan_uuid": scan_uuid}
 
