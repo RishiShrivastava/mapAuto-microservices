@@ -1,6 +1,7 @@
 # =Juggernaut= Updated docker-compose.yml for persistence and restart policies
 services:
   auto_nessus:
+    image: mapauto-microservices-auto_nessus:1.0
     build: ./auto_nessus_service
     ports:
       - "8000:8000"
@@ -19,6 +20,7 @@ services:
       retries: 3
       start_period: 40s
   nmapscanner:
+    image: mapauto-microservices-nmapscanner:1.0
     build: ./nmapscanner_service
     ports:
       - "8001:8001"
@@ -36,6 +38,7 @@ services:
       retries: 3
       start_period: 40s
   nmapall:
+    image: mapauto-microservices-nmapall:1.0
     build: ./nmapall_service
     ports:
       - "8002:8002"
@@ -53,6 +56,7 @@ services:
       retries: 3
       start_period: 40s
   osscan:
+    image: mapauto-microservices-osscan:1.0
     build: ./osscan_service
     ports:
       - "8003:8003"
@@ -70,6 +74,7 @@ services:
       retries: 3
       start_period: 40s
   portxmlparser:
+    image: mapauto-microservices-portxmlparser:1.0
     build: ./portxmlparser_service
     ports:
       - "8004:8004"
