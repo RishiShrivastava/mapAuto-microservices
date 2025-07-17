@@ -1,0 +1,31 @@
+# =Juggernaut= Frontend dependencies for development
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =Juggernaut= Production build directory
+build/
+dist/
+
+# =Juggernaut= Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# =Juggernaut= IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =Juggernaut= OS generated files
+.DS_Store
+Thumbs.db
+
+# =Juggernaut= Logs
+*.log
+
+# =Juggernaut= No original .gitignore deleted, this is new file for frontend

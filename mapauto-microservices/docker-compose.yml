@@ -92,7 +92,58 @@ services:
       retries: 3
       start_period: 40s
 
+  # =Juggernaut= React frontend service - enhanced configuration with HTTPS
+  frontend:
+    build: ../frontend
+    image: mapauto-microservices-frontend:1.0 # =Juggernaut=
+    container_name: mapauto-frontend # =Juggernaut=
+    ports:
+      - "3000:3000" # =Juggernaut= Keep original port for development
+    restart: unless-stopped # =Juggernaut=
+    environment:
+      - CHOKIDAR_USEPOLLING=true # =Juggernaut= For file watching in Docker
+      - WATCHPACK_POLLING=true   # =Juggernaut= For hot reload
+      - HTTPS=false # =Juggernaut= Disable HTTPS inside container (handled by reverse proxy)
+    depends_on:
+      - nmapscanner
+      - nmapall
+      - osscan
+      - portxmlparser
+      - auto_nessus
+    # =Juggernaut= Health check for frontend service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # =Juggernaut= Nginx reverse proxy for HTTPS
+  nginx:
+    build: ../nginx
+    image: mapauto-microservices-nginx:1.0 # =Juggernaut=
+    container_name: mapauto-nginx # =Juggernaut=
+    ports:
+      - "443:443" # =Juggernaut= HTTPS port for user access
+      - "80:80"   # =Juggernaut= HTTP port (redirects to HTTPS)
+    restart: unless-stopped # =Juggernaut=
+    depends_on:
+      - frontend
+      - auto_nessus
+      - nmapscanner
+      - nmapall
+      - osscan
+      - portxmlparser
+    # =Juggernaut= Health check for nginx service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 # =Juggernaut= Added named volumes for data persistence
 volumes:
   nessus_data:
     driver: local
+    # =Juggernaut= No original code deleted, only enhanced frontend configuration
