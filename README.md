@@ -502,16 +502,13 @@ Access Swagger UI for each service:
 ### Development Workflow
 1. Fork the repository
 2. Create feature branch: `git checkout -b feature/new-feature`
-3. Make changes with `=Juggernaut=` comments
-4. Test thoroughly
-5. Submit pull request
 
 ### Code Standards
 - Follow PEP 8 for Python code
 - Add comprehensive error handling
 - Include health check endpoints
 - Document all API endpoints
-- Add comments with `=Juggernaut=` tag
+
 
 ---
 
@@ -627,10 +624,7 @@ For issues and questions:
   - All API endpoints documented
   - Troubleshooting section
   - Performance tuning guide
-- **Updated files**:
-  - `README.md` (completely rewritten)
-  - `.gitignore` (added health check exclusions)
-  - `mapauto-microservices/.gitignore` (created)
+
 
 ### Commands Summary for Full Setup
 
@@ -656,7 +650,7 @@ curl -X POST "http://localhost:8001/scan?ip=192.168.0.231&timeout=60"
 curl -X POST "http://localhost:8002/scan-all?ip=192.168.0.231&timeout=60&max_scripts=5"
 curl -X POST "http://localhost:8004/parse-xml?xml_path=/path/to/xml"
 
-# 6. Access web dashboard =Juggernaut=
+# 6. Access web dashboard
 # Visit http://localhost:3000 for the React web interface
 
 # 7. Access API documentation
