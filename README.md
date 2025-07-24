@@ -710,3 +710,126 @@ All services tested successfully with target IP `192.168.0.231`:
 
 *Last updated: July 16, 2025*
 *Version: 2.0.0 (Microservices Architecture)*
+
+# 🌐 Web Dashboard Usage =Juggernaut=
+
+## Access the Dashboard
+1. Start all services:
+   ```bash
+   sudo docker compose up --build -d
+   ```
+2. Open your browser and go to: **https://localhost**
+3. Accept the self-signed certificate warning (for development)
+4. You'll see the MapAuto Network Scanner Dashboard
+
+## Dashboard Overview
+The dashboard has 3 main tabs:
+- **Scanner Tab**: Configure and run scans
+- **Results Tab**: View scan results in real-time
+- **History Tab**: See previous scan history
+
+## Scan Configuration
+In the **Scanner Tab**:
+- **Target IP Address**: Enter the IP you want to scan (e.g., 192.168.0.231)
+- **Timeout (seconds)**: Set scan timeout (default: 60s)
+- **Max Scripts**: For comprehensive scans (default: 5)
+- **XML File Path**: For parsing existing XML results
+
+## Available Scan Types
+
+### 🔍 OS Scan
+- **Purpose**: Identifies the operating system
+- **Service**: Port 8003
+- **Best for**: Quick OS fingerprinting
+- **Example Result**: "Linux 5.0 - 5.4"
+
+### 🌐 Nmap Scan
+- **Purpose**: Intelligent port scanning with script execution
+- **Service**: Port 8001
+- **Best for**: Comprehensive security assessment
+- **Example Result**: Open ports with service details
+
+### ⚡ Nmap All Scripts
+- **Purpose**: Run extensive Nmap script collection
+- **Service**: Port 8002
+- **Best for**: Deep vulnerability assessment
+- **Warning**: Takes longer, use carefully
+
+### 📄 Parse XML
+- **Purpose**: Parse existing Nmap XML files
+- **Service**: Port 8004
+- **Best for**: Analyzing saved scan results
+- **Input**: Full path to XML file
+
+### 🛡️ Nessus Status
+- **Purpose**: Check Nessus service connectivity
+- **Service**: Port 8000
+- **Best for**: Verifying Nessus integration
+
+## Running a Scan
+1. Enter your target IP (e.g., 192.168.0.231)
+2. Click the desired scan type button
+3. Watch the loading indicator
+4. Results appear automatically in the **Results Tab**
+
+## Understanding Results
+Results show:
+- **Target Information**: IP address scanned
+- **Open Ports**: List of accessible services
+- **Scan Details**: Folder location, timing
+- **Raw JSON**: Complete technical details
+
+## Scan History
+- All scans are automatically saved
+- Access via **History Tab**
+- Shows timestamp, scan type, and target
+- Click to expand and view previous results
+
+## Command Line Access (Alternative)
+If you prefer command line access:
+```bash
+# OS Scan
+curl -X POST "https://localhost/api/osscan/os-scan?ip=192.168.0.231&timeout=30" -k
+
+# Nmap Scan  
+curl -X POST "https://localhost/api/nmapscanner/scan?ip=192.168.0.231&timeout=60" -k
+
+# Nmap All Scripts
+curl -X POST "https://localhost/api/nmapall/scan-all?ip=192.168.0.231&timeout=60&max_scripts=5" -k
+
+# Parse XML
+curl -X POST "https://localhost/api/portxmlparser/parse-xml?xml_path=/path/to/file.xml" -k
+
+# Nessus Status
+curl -X POST "https://localhost/api/auto_nessus/status" -k
+```
+
+## Security Features
+- **HTTPS Encryption**: All web traffic encrypted via SSL/TLS
+- **Network Isolation**: Backend services only accessible through nginx proxy
+- **Input Validation**: IP address and file path validation, timeout limits
+
+## Monitoring & Health Checks
+- **Service Health**: All services have built-in health checks
+- **Log Monitoring**: `sudo docker compose logs -f` or `sudo docker logs mapauto-frontend`
+
+## Troubleshooting
+- "Cannot connect to https://localhost": Check nginx container, restart if needed
+- "Frontend shows errors": Check frontend logs, restart frontend
+- "Scan not working": Verify target IP, check timeout, view backend logs
+- "SSL Certificate Warning": Normal for development, click "Advanced" → "Proceed to localhost"
+
+## System Management
+- **Start All Services**: `sudo docker compose up -d`
+- **Stop All Services**: `sudo docker compose down`
+- **Rebuild After Changes**: `sudo docker compose up --build -d`
+- **View Status**: `sudo docker compose ps`
+
+## Best Practices
+1. Always use HTTPS: Access via https://localhost for security
+2. Set appropriate timeouts: Longer for comprehensive scans
+3. Monitor resources: Check system performance during scans
+4. Review scan history: Learn from previous results
+5. Use development responsibly: Only scan authorized targets
+
+---
