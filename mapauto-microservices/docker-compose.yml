@@ -3,8 +3,9 @@ services:
   auto_nessus:
     image: mapauto-microservices-auto_nessus:1.0
     build: ./auto_nessus_service
-    ports:
-      - "8000:8000"
+    # =Juggernaut= Port only exposed internally, accessed via nginx reverse proxy
+    expose:
+      - "8000"
     env_file:
       - ../.env
     # =Juggernaut= Added restart policy and volume for persistence
@@ -22,8 +23,9 @@ services:
   nmapscanner:
     image: mapauto-microservices-nmapscanner:1.0
     build: ./nmapscanner_service
-    ports:
-      - "8001:8001"
+    # =Juggernaut= Port only exposed internally, accessed via nginx reverse proxy
+    expose:
+      - "8001"
     env_file:
       - ../.env
     # =Juggernaut= Added restart policy and volume for persistence
@@ -40,8 +42,9 @@ services:
   nmapall:
     image: mapauto-microservices-nmapall:1.0
     build: ./nmapall_service
-    ports:
-      - "8002:8002"
+    # =Juggernaut= Port only exposed internally, accessed via nginx reverse proxy
+    expose:
+      - "8002"
     env_file:
       - ../.env
     # =Juggernaut= Added restart policy and volume for persistence
@@ -58,8 +61,9 @@ services:
   osscan:
     image: mapauto-microservices-osscan:1.0
     build: ./osscan_service
-    ports:
-      - "8003:8003"
+    # =Juggernaut= Port only exposed internally, accessed via nginx reverse proxy
+    expose:
+      - "8003"
     env_file:
       - ../.env
     # =Juggernaut= Added restart policy and volume for persistence
@@ -76,8 +80,9 @@ services:
   portxmlparser:
     image: mapauto-microservices-portxmlparser:1.0
     build: ./portxmlparser_service
-    ports:
-      - "8004:8004"
+    # =Juggernaut= Port only exposed internally, accessed via nginx reverse proxy
+    expose:
+      - "8004"
     env_file:
       - ../.env
     # =Juggernaut= Added restart policy and volume for persistence
@@ -97,8 +102,9 @@ services:
     build: ../frontend
     image: mapauto-microservices-frontend:1.0 # =Juggernaut=
     container_name: mapauto-frontend # =Juggernaut=
-    ports:
-      - "3000:3000" # =Juggernaut= Keep original port for development
+    # =Juggernaut= Port 3000 only exposed internally, accessed via nginx reverse proxy
+    expose:
+      - "3000"
     restart: unless-stopped # =Juggernaut=
     environment:
       - CHOKIDAR_USEPOLLING=true # =Juggernaut= For file watching in Docker
@@ -118,14 +124,13 @@ services:
       retries: 3
       start_period: 60s
 
-  # =Juggernaut= Nginx reverse proxy for HTTPS
+  # =Juggernaut= Nginx reverse proxy for HTTPS only
   nginx:
     build: ../nginx
     image: mapauto-microservices-nginx:1.0 # =Juggernaut=
     container_name: mapauto-nginx # =Juggernaut=
     ports:
-      - "443:443" # =Juggernaut= HTTPS port for user access
-      - "80:80"   # =Juggernaut= HTTP port (redirects to HTTPS)
+      - "443:443" # =Juggernaut= HTTPS port for secure user access only
     restart: unless-stopped # =Juggernaut=
     depends_on:
       - frontend
