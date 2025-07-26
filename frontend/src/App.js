@@ -18,6 +18,8 @@ import {
   AppBar,
   Toolbar,
   Chip,
+  FormControlLabel,
+  Checkbox,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -114,10 +116,70 @@ function ResultsDisplay({ results, loading, error }) {
           <Typography variant="h6">Scan Results</Typography>
         </AccordionSummary>
         <AccordionDetails>
-          {/* =Juggernaut= Display key information prominently */}
-          {data.target_ip && (
+          {/* =Juggernaut= Display target information */}
+          {(data.target_ip || data.target_url) && (
             <Box mb={2}>
-              <Chip label={`Target: ${data.target_ip}`} color="primary" variant="outlined" />
+              <Chip label={`Target: ${data.target_ip || data.target_url}`} color="primary" variant="outlined" />
+            </Box>
+          )}
+          
+          {/* =Juggernaut= Display WAF detection results */}
+          {data.waf_detected !== undefined && (
+            <Box mb={2}>
+              <Typography variant="subtitle1" gutterBottom>WAF Detection Results:</Typography>
+              <Chip 
+                label={data.waf_detected ? `WAF Detected: ${data.waf_name || data.waf_type || 'Unknown'}` : 'No WAF Detected'} 
+                color={data.waf_detected ? "warning" : "success"} 
+                variant="filled" 
+                sx={{ mb: 1, mr: 1 }}
+              />
+              {data.waf_detected && (
+                <Chip 
+                  label={`Confidence: ${(data.confidence_level * 100).toFixed(1)}%`} 
+                  color="info" 
+                  variant="outlined" 
+                  sx={{ mb: 1 }}
+                />
+              )}
+              
+              {data.weaknesses && data.weaknesses.length > 0 && (
+                <Box mt={2}>
+                  <Typography variant="subtitle2" color="error">Identified Weaknesses:</Typography>
+                  <List dense>
+                    {data.weaknesses.map((weakness, index) => (
+                      <ListItem key={index}>
+                        <ListItemText primary={weakness} />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
+              
+              {data.bypass_techniques && data.bypass_techniques.length > 0 && (
+                <Box mt={2}>
+                  <Typography variant="subtitle2" color="warning">Potential Bypass Techniques:</Typography>
+                  <List dense>
+                    {data.bypass_techniques.slice(0, 5).map((technique, index) => (
+                      <ListItem key={index}>
+                        <ListItemText primary={technique} />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
+              
+              {data.security_recommendations && data.security_recommendations.length > 0 && (
+                <Box mt={2}>
+                  <Typography variant="subtitle2" color="success">Security Recommendations:</Typography>
+                  <List dense>
+                    {data.security_recommendations.slice(0, 5).map((recommendation, index) => (
+                      <ListItem key={index}>
+                        <ListItemText primary={recommendation} />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
             </Box>
           )}
           
@@ -179,9 +241,11 @@ function App() {
   const [activeTab, setActiveTab] = useState(0);
   const [scanInputs, setScanInputs] = useState({
     ip: '192.168.0.231', // =Juggernaut= Default from README examples
+    target: '', // =Juggernaut= For WAF detection (URL or IP)
     timeout: 60,
     maxScripts: 5,
-    xmlPath: ''
+    xmlPath: '',
+    intensive: false // =Juggernaut= For intensive WAF scanning
   });
   const [scanResults, setScanResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -240,6 +304,9 @@ function App() {
           break;
         case 'nessus-status':
           url = `/api/auto_nessus/status`;
+          break;
+        case 'waf-detection':
+          url = `/api/waf/detect-waf?target=${scanInputs.target || scanInputs.ip}&timeout=${scanInputs.timeout}&intensive=${scanInputs.intensive || false}`;
           break;
         default:
           throw new Error('Unknown scan type');
@@ -320,6 +387,16 @@ function App() {
                     helperText="Enter the IP address to scan"
                   />
                 </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="WAF Target (URL or IP)"
+                    value={scanInputs.target}
+                    onChange={(e) => handleInputChange('target', e.target.value)}
+                    placeholder="https://example.com or 192.168.1.100"
+                    helperText="Target for WAF detection (URL or IP)"
+                  />
+                </Grid>
                 <Grid item xs={12} md={3}>
                   <TextField
                     fullWidth
@@ -348,6 +425,18 @@ function App() {
                     onChange={(e) => handleInputChange('xmlPath', e.target.value)}
                     placeholder="/app/scan_results/osscan_192.168.0.231_20250717_160231/OSScan_192.168.0.231.xml"
                     helperText="Full path to XML file for parsing"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={scanInputs.intensive}
+                        onChange={(e) => handleInputChange('intensive', e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Intensive WAF Scanning (includes nmap scans - slower but more thorough)"
                   />
                 </Grid>
               </Grid>
@@ -389,6 +478,17 @@ function App() {
                   loading={loading}
                   disabled={!scanInputs.ip}
                   color="warning"
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={4}>
+                <ScanCard
+                  title="WAF Detection"
+                  description="Detect and analyze Web Application Firewalls (Port 8005)"
+                  icon={<SecurityIcon color="error" />}
+                  onScan={() => handleScan('waf-detection')}
+                  loading={loading}
+                  disabled={!scanInputs.target && !scanInputs.ip}
+                  color="error"
                 />
               </Grid>
               <Grid item xs={12} md={6} lg={4}>

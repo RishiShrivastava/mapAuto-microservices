@@ -12,6 +12,7 @@ MapAuto is a production-ready microservices toolkit for automating network scann
 - **nmapall_service** (Port 8002): Execute all nmap scripts against target IP
 - **osscan_service** (Port 8003): OS fingerprinting using nmap
 - **portxmlparser_service** (Port 8004): Parse nmap XML files for port information
+- **waf_detection_service** (Port 8005): Advanced WAF detection and vulnerability analysis =Juggernaut=
 - **frontend** (Port 3000): React web dashboard for scan management =Juggernaut=
 
 ### Production Features
@@ -22,6 +23,34 @@ MapAuto is a production-ready microservices toolkit for automating network scann
 - **✅ Resource Limits**: Timeout controls and process limits
 - **✅ Comprehensive Logging**: All operations logged with timestamps
 - **✅ Web Dashboard**: React-based UI for scan management and results =Juggernaut=
+- **✅ WAF Detection & Analysis**: Advanced Web Application Firewall identification with weakness analysis =Juggernaut=
+
+### WAF Detection Capabilities =Juggernaut=
+
+#### 🛡️ Supported WAF Types (8 Major Platforms)
+- **Cloudflare**: CDN-integrated protection with global edge network
+- **AWS WAF**: Amazon's cloud-native web application firewall
+- **Akamai**: Enterprise-grade edge security platform
+- **Incapsula**: Imperva's cloud-based application security
+- **ModSecurity**: Open-source web application firewall engine
+- **Barracuda**: Network security and data protection appliances
+- **F5 ASM**: Application Security Manager for enterprise environments
+- **Imperva SecureSphere**: Advanced threat protection platform
+
+#### 🔍 Detection Methods
+- **HTTP Header Analysis**: Server headers, security headers, custom headers
+- **Cookie Fingerprinting**: WAF-specific cookies and session tokens
+- **Response Code Patterns**: Characteristic HTTP status codes and error pages
+- **Content Pattern Matching**: WAF-specific error messages and content signatures
+- **Payload Testing**: XSS, SQLi, command injection, and path traversal attempts
+- **Nmap Script Integration**: Advanced scripted detection for intensive analysis
+
+#### 🎯 Analysis Features
+- **Weakness Identification**: Common vulnerabilities and configuration flaws
+- **Bypass Techniques**: Header manipulation, encoding bypasses, protocol attacks
+- **Security Recommendations**: Hardening suggestions and best practices
+- **Confidence Scoring**: Reliability assessment of detection results
+- **Multi-method Validation**: Cross-verification using multiple detection approaches
 
 ---
 
@@ -113,21 +142,55 @@ python3 health_check.py
 Expected output:
 ```
 === mapAuto Microservices Health Check ===
-Checking 5 services...
+Checking 6 services...
 
 ✅ auto_nessus: healthy (0.025s)
 ✅ nmapscanner: healthy (0.018s)
 ✅ nmapall: healthy (0.022s)
 ✅ osscan: healthy (0.019s)
 ✅ portxmlparser: healthy (0.016s)
+✅ waf_detection: healthy (0.021s)
 
-Health Summary: 5/5 services healthy
+Health Summary: 6/6 services healthy
 🎉 All services are healthy!
 ```
 
 ---
 
 ## 🔧 API Usage Examples
+
+### WAF Detection Service (Port 8005) =Juggernaut=
+```bash
+# Analyze a target for WAF presence and type
+curl -X POST "https://localhost/api/waf/analyze?target=https://example.com" -k
+
+# Get supported WAF signatures
+curl "https://localhost/api/waf/signatures" -k
+
+# Check service status
+curl "https://localhost/api/waf/status" -k
+
+# Response includes comprehensive WAF analysis
+{
+  "target": "https://example.com",
+  "waf_detected": true,
+  "waf_type": "cloudflare",
+  "confidence": 95,
+  "detection_methods": ["headers", "content_patterns"],
+  "weaknesses": [
+    "Origin IP discovery via DNS records",
+    "Subdomain enumeration bypass"
+  ],
+  "bypass_techniques": [
+    "X-Originating-IP header manipulation",
+    "Unicode normalization bypasses"
+  ],
+  "recommendations": [
+    "Implement origin server IP protection",
+    "Configure proper DNS security"
+  ]
+}
+```
 
 ### NmapScanner Service (Port 8001)
 ```bash
@@ -294,6 +357,9 @@ sudo docker compose start
 
 # Verify scan results are still there
 sudo docker exec -it mapauto-microservices-nmapscanner-1 ls -la /app/scan_results/
+
+# Verify WAF detection data persistence
+sudo docker exec -it mapauto-waf-detection ls -la /app/waf_results/
 ```
 
 ### Backup and Recovery
@@ -444,26 +510,31 @@ Services handle concurrent requests, but consider:
 python3 health_check.py
 
 # Test individual endpoints
-curl http://localhost:8001/status
-curl http://localhost:8002/status
-curl http://localhost:8003/status
-curl http://localhost:8004/status
-curl http://localhost:8000/status
+curl "https://localhost/api/auto_nessus/status" -k
+curl "https://localhost/api/nmapscanner/status" -k
+curl "https://localhost/api/nmapall/status" -k
+curl "https://localhost/api/osscan/status" -k
+curl "https://localhost/api/portxmlparser/status" -k
+curl "https://localhost/api/waf/status" -k
 ```
 
 ### Integration Testing
 ```bash
 # Full workflow test
 TARGET_IP="192.168.1.100"
+TARGET_URL="https://example.com"
 
 # 1. OS scan
-curl -X POST "http://localhost:8003/os-scan?ip=$TARGET_IP&timeout=60"
+curl -X POST "https://localhost/api/osscan/os-scan?ip=$TARGET_IP&timeout=60" -k
 
 # 2. Intelligent scan
-curl -X POST "http://localhost:8001/scan?ip=$TARGET_IP&timeout=300"
+curl -X POST "https://localhost/api/nmapscanner/scan?ip=$TARGET_IP&timeout=300" -k
 
-# 3. Parse results
-curl -X POST "http://localhost:8004/parse-xml?xml_path=/app/scan_results/osscan_${TARGET_IP}_[timestamp]/OSScan_${TARGET_IP}.xml"
+# 3. WAF analysis
+curl -X POST "https://localhost/api/waf/analyze?target=$TARGET_URL" -k
+
+# 4. Parse results
+curl -X POST "https://localhost/api/portxmlparser/parse-xml?xml_path=/app/scan_results/osscan_${TARGET_IP}_[timestamp]/OSScan_${TARGET_IP}.xml" -k
 ```
 
 ### Load Testing
@@ -481,19 +552,21 @@ hey -n 100 -c 10 http://localhost:8001/status
 
 ### Interactive API Documentation
 Access Swagger UI for each service:
-- **auto_nessus**: http://localhost:8000/docs
-- **nmapscanner**: http://localhost:8001/docs
-- **nmapall**: http://localhost:8002/docs
-- **osscan**: http://localhost:8003/docs
-- **portxmlparser**: http://localhost:8004/docs
-- **frontend**: http://localhost:3000 (React Dashboard) =Juggernaut=
+- **auto_nessus**: https://localhost/api/auto_nessus/docs
+- **nmapscanner**: https://localhost/api/nmapscanner/docs
+- **nmapall**: https://localhost/api/nmapall/docs
+- **osscan**: https://localhost/api/osscan/docs
+- **portxmlparser**: https://localhost/api/portxmlparser/docs
+- **waf_detection**: https://localhost/api/waf/docs =Juggernaut=
+- **frontend**: https://localhost (React Dashboard) =Juggernaut=
 
 ### OpenAPI Specifications
-- **auto_nessus**: http://localhost:8000/openapi.json
-- **nmapscanner**: http://localhost:8001/openapi.json
-- **nmapall**: http://localhost:8002/openapi.json
-- **osscan**: http://localhost:8003/openapi.json
-- **portxmlparser**: http://localhost:8004/openapi.json
+- **auto_nessus**: https://localhost/api/auto_nessus/openapi.json
+- **nmapscanner**: https://localhost/api/nmapscanner/openapi.json
+- **nmapall**: https://localhost/api/nmapall/openapi.json
+- **osscan**: https://localhost/api/osscan/openapi.json
+- **portxmlparser**: https://localhost/api/portxmlparser/openapi.json
+- **waf_detection**: https://localhost/api/waf/openapi.json =Juggernaut=
 
 ---
 
@@ -538,6 +611,26 @@ For issues and questions:
 ---
 
 ## 🚀 Recent Updates and Improvements
+
+### Version 2.1.0 - WAF Detection Integration (July 25, 2025) =Juggernaut=
+
+#### ✅ **Advanced WAF Detection Service**
+- **Implementation**: Comprehensive WAF identification and analysis engine
+- **Features**: 8 major WAF platform support with fingerprinting capabilities
+- **Detection Methods**: HTTP analysis, payload testing, nmap integration
+- **Security Analysis**: Weakness identification, bypass techniques, hardening recommendations
+
+#### ✅ **Enhanced Security Architecture**
+- **HTTPS-Only Access**: SSL/TLS encryption for all web communications
+- **Nginx Reverse Proxy**: Centralized routing with extended timeouts for WAF analysis
+- **Input Validation**: URL validation, IP address checking, timeout limits
+- **Resource Protection**: Rate limiting and secure header implementation
+
+#### ✅ **Expanded API Coverage**
+- **WAF Analysis Endpoint**: `/api/waf/analyze` for comprehensive target analysis
+- **Signature Database**: `/api/waf/signatures` for supported WAF information
+- **Health Monitoring**: Integrated health checks for service reliability
+- **Documentation**: Interactive Swagger UI at `/api/waf/docs`
 
 ### Version 2.0.0 - Microservices Architecture (July 16, 2025)
 
@@ -645,13 +738,14 @@ sudo docker compose ps
 python3 health_check.py
 
 # 5. Test the services
-curl -X POST "http://localhost:8003/os-scan?ip=192.168.0.231&timeout=30"
-curl -X POST "http://localhost:8001/scan?ip=192.168.0.231&timeout=60"
-curl -X POST "http://localhost:8002/scan-all?ip=192.168.0.231&timeout=60&max_scripts=5"
-curl -X POST "http://localhost:8004/parse-xml?xml_path=/path/to/xml"
+curl -X POST "https://localhost/api/osscan/os-scan?ip=192.168.0.231&timeout=30" -k
+curl -X POST "https://localhost/api/nmapscanner/scan?ip=192.168.0.231&timeout=60" -k
+curl -X POST "https://localhost/api/nmapall/scan-all?ip=192.168.0.231&timeout=60&max_scripts=5" -k
+curl -X POST "https://localhost/api/portxmlparser/parse-xml?xml_path=/path/to/xml" -k
+curl -X POST "https://localhost/api/waf/analyze?target=https://example.com" -k
 
 # 6. Access web dashboard
-# Visit http://localhost:3000 for the React web interface
+# Visit https://localhost for the React web interface
 
 # 7. Access API documentation
 # Visit http://localhost:8001/docs (and ports 8000-8004)
@@ -683,82 +777,12 @@ sudo docker compose up --build -d
 4. **Parse XML** (Port 8004): Parse and format existing XML scan results
 5. **Nessus Status** (Port 8000): Check Nessus service connectivity
 
----
-
-### Test Results Summary
-
-All services tested successfully with target IP `192.168.0.231`:
-
-- **✅ auto_nessus_service**: Running, graceful Nessus handling
-- **✅ nmapscanner_service**: OS scan + intelligent script selection
-- **✅ nmapall_service**: Limited script execution (safety)
-- **✅ osscan_service**: OS fingerprinting (Linux 5.4 detected)
-- **✅ portxmlparser_service**: XML parsing with archival
-
-**Container Health**: All 5 containers showing `healthy` status
-**Persistence**: Verified across container restarts
-**Folder Organization**: All scans create timestamped folders
-**Performance**: Response times < 10ms for health checks
-
----
-
-*Last updated: July 16, 2025*
-*Version: 2.0.0 (Microservices Architecture)*
-
-# 🌐 Web Dashboard Usage =Juggernaut=
-
-## Access the Dashboard
-1. Start all services:
-   ```bash
-   sudo docker compose up --build -d
-   ```
-2. Open your browser and go to: **https://localhost**
-3. Accept the self-signed certificate warning (for development)
-4. You'll see the MapAuto Network Scanner Dashboard
-
-## Dashboard Overview
-The dashboard has 3 main tabs:
-- **Scanner Tab**: Configure and run scans
-- **Results Tab**: View scan results in real-time
-- **History Tab**: See previous scan history
-
-## Scan Configuration
+### Scan Configuration
 In the **Scanner Tab**:
 - **Target IP Address**: Enter the IP you want to scan (e.g., 192.168.0.231)
 - **Timeout (seconds)**: Set scan timeout (default: 60s)
 - **Max Scripts**: For comprehensive scans (default: 5)
 - **XML File Path**: For parsing existing XML results
-
-## Available Scan Types
-
-### 🔍 OS Scan
-- **Purpose**: Identifies the operating system
-- **Service**: Port 8003
-- **Best for**: Quick OS fingerprinting
-- **Example Result**: "Linux 5.0 - 5.4"
-
-### 🌐 Nmap Scan
-- **Purpose**: Intelligent port scanning with script execution
-- **Service**: Port 8001
-- **Best for**: Comprehensive security assessment
-- **Example Result**: Open ports with service details
-
-### ⚡ Nmap All Scripts
-- **Purpose**: Run extensive Nmap script collection
-- **Service**: Port 8002
-- **Best for**: Deep vulnerability assessment
-- **Warning**: Takes longer, use carefully
-
-### 📄 Parse XML
-- **Purpose**: Parse existing Nmap XML files
-- **Service**: Port 8004
-- **Best for**: Analyzing saved scan results
-- **Input**: Full path to XML file
-
-### 🛡️ Nessus Status
-- **Purpose**: Check Nessus service connectivity
-- **Service**: Port 8000
-- **Best for**: Verifying Nessus integration
 
 ## Running a Scan
 1. Enter your target IP (e.g., 192.168.0.231)
@@ -782,6 +806,9 @@ Results show:
 ## Command Line Access (Alternative)
 If you prefer command line access:
 ```bash
+# WAF Detection
+curl -X POST "https://localhost/api/waf/analyze?target=https://example.com" -k
+
 # OS Scan
 curl -X POST "https://localhost/api/osscan/os-scan?ip=192.168.0.231&timeout=30" -k
 
@@ -827,3 +854,142 @@ curl -X POST "https://localhost/api/auto_nessus/status" -k
 5. Use development responsibly: Only scan authorized targets
 
 ---
+
+## 📖 User Guide: MapAuto Microservices
+
+## Getting Started
+
+### 1. Prerequisites
+- Docker & Docker Compose installed
+- Python 3.11+ (for health checks)
+- (Optional) Nessus for vulnerability scanning
+
+### 2. Quick Start
+```bash
+# Clone the repository
+git clone https://github.com/RishiShrivastava/mapAuto-microservices.git
+cd mapAuto-microservices
+
+# Switch to dev branch
+git checkout dev
+
+# Copy and edit environment variables
+cp .env.template .env
+nano .env  # Add Nessus credentials if needed
+
+# Build and start all services
+cd mapauto-microservices
+sudo docker compose up --build -d
+
+# Check status
+sudo docker compose ps
+```
+
+### 3. Access the Web Dashboard
+- Open your browser and go to: **https://localhost**
+- Accept the SSL warning (self-signed cert for demo)
+- Use the dashboard to:
+  - Configure and launch scans
+  - View scan results and history
+  - Monitor service health
+
+---
+
+## Example Workflows
+
+### A. WAF Detection (via API)
+```bash
+# Analyze a target for WAF presence and type
+curl -X POST "https://localhost/api/waf/analyze?target=https://example.com" -k
+
+# Get supported WAF signatures
+curl "https://localhost/api/waf/signatures" -k
+
+# Check WAF detection service status
+curl "https://localhost/api/waf/status" -k
+```
+
+### B. Nmap Scanning (via API)
+```bash
+# Intelligent scan
+curl -X POST "https://localhost/api/nmapscanner/scan?ip=192.168.1.100&timeout=300" -k
+
+# All scripts scan (limited for safety)
+curl -X POST "https://localhost/api/nmapall/scan-all?ip=192.168.1.100&timeout=300&max_scripts=10" -k
+```
+
+### C. OS Fingerprinting
+```bash
+curl -X POST "https://localhost/api/osscan/os-scan?ip=192.168.1.100&timeout=60" -k
+```
+
+### D. XML Parsing
+```bash
+curl -X POST "https://localhost/api/portxmlparser/parse-xml?xml_path=/app/scan_results/osscan_192.168.1.100_20250716_143045/OSScan_192.168.1.100.xml" -k
+```
+
+### E. Nessus Status
+```bash
+curl -X POST "https://localhost/api/auto_nessus/status" -k
+```
+
+---
+
+## Using the Web Dashboard
+
+1. **Start all services:**
+   ```bash
+   sudo docker compose up --build -d
+   ```
+2. **Open your browser:**
+   - Go to: https://localhost
+   - Accept the SSL warning
+3. **Configure a scan:**
+   - Enter the target IP (e.g., 192.168.0.231)
+   - Set timeout and max scripts as needed
+   - Click the scan type (OS Scan, Nmap Scan, etc.)
+4. **View results:**
+   - Results appear in the Results tab
+   - Scan history is available in the History tab
+5. **Monitor health:**
+   - Health status is shown for all services
+
+---
+
+## Troubleshooting & Tips
+- If you see SSL warnings, this is normal for self-signed certs in demo mode.
+- If a scan fails, check the logs:
+  ```bash
+  sudo docker compose logs -f
+  ```
+- To restart a service:
+  ```bash
+  sudo docker compose restart <service>
+  ```
+- For persistent data, all scan results are saved in `scan_results/`.
+- To update the app, pull the latest code and rebuild:
+  ```bash
+  git pull
+  sudo docker compose up --build -d
+  ```
+
+---
+
+## Security Best Practices
+- Always use HTTPS (https://localhost)
+- Never commit real credentials to git
+- Monitor logs for suspicious activity
+- Use only on authorized targets
+
+---
+
+# 🎯 Example Use Cases
+
+- **Penetration Testers:** Automate reconnaissance and WAF detection for client networks.
+- **DevSecOps:** Integrate into CI/CD for continuous security scanning.
+- **Blue Teams:** Monitor and validate WAF deployments and network exposure.
+- **Educators:** Demonstrate real-world scanning and WAF bypass techniques in a safe lab.
+
+---
+
+For more details, see the full API documentation and the examples above. For help, check the Troubleshooting section or open an issue on GitHub.

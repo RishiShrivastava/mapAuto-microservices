@@ -62,3 +62,10 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+# =Juggernaut= Security update reminder (v2.1.0+)
+# If you add new config, SSL keys, or secrets, always add them here!
+# Example:
+# /nginx/certs/
+# /scan_results/
+# /waf_results/

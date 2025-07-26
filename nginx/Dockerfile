@@ -1,22 +1,17 @@
-# =Juggernaut= Nginx Dockerfile for HTTPS reverse proxy
-FROM nginx:alpine
+# =Juggernaut= Secure Nginx with ModSecurity WAF for Production Demo
+FROM owasp/modsecurity-crs:nginx
 
-# =Juggernaut= Install openssl for generating self-signed certificates
-RUN apk add --no-cache openssl
+# =Juggernaut= Create SSL certificate directory
+RUN mkdir -p /etc/nginx/certs
 
-# =Juggernaut= Create SSL directory
-RUN mkdir -p /etc/nginx/ssl
+# =Juggernaut= Generate SSL certificate for HTTPS
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
+    -keyout /etc/nginx/certs/key.pem \
+    -out /etc/nginx/certs/cert.pem \
+    -subj "/C=US/ST=Production/L=Demo/O=MapAuto Security/CN=localhost"
 
-# =Juggernaut= Generate self-signed SSL certificate for development
-RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout /etc/nginx/ssl/key.pem \
-    -out /etc/nginx/ssl/cert.pem \
-    -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
+# =Juggernaut= Copy nginx configuration adapted for MapAuto services
+COPY nginx.conf /etc/nginx/templates/conf.d/default.conf.template
 
-# =Juggernaut= Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# =Juggernaut= Expose HTTPS and HTTP ports
-EXPOSE 80 443
-
-# =Juggernaut= No original Dockerfile deleted, this is a new file
+# =Juggernaut= Only expose HTTPS port for external access  
+EXPOSE 443

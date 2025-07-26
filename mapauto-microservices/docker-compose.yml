@@ -97,6 +97,29 @@ services:
       retries: 3
       start_period: 40s
 
+  # =Juggernaut= WAF Detection Service - Advanced Web Application Firewall Analysis
+  waf_detection:
+    image: mapauto-microservices-waf_detection:1.0
+    build: ./waf_detection_service
+    container_name: mapauto-waf-detection # =Juggernaut=
+    # =Juggernaut= Port only exposed internally, accessed via nginx reverse proxy
+    expose:
+      - "8005"
+    env_file:
+      - ../.env
+    # =Juggernaut= Added restart policy and volume for persistence
+    restart: unless-stopped
+    volumes:
+      - ./scan_results:/app/waf_results
+      - waf_data:/app/data
+    # =Juggernaut= Added health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # =Juggernaut= React frontend service - enhanced configuration with HTTPS
   frontend:
     build: ../frontend
@@ -116,6 +139,7 @@ services:
       - osscan
       - portxmlparser
       - auto_nessus
+      - waf_detection
     # =Juggernaut= Health check for frontend service
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
@@ -124,13 +148,13 @@ services:
       retries: 3
       start_period: 60s
 
-  # =Juggernaut= Nginx reverse proxy for HTTPS only
+  # =Juggernaut= Nginx reverse proxy with ModSecurity WAF for Production Demo
   nginx:
     build: ../nginx
-    image: mapauto-microservices-nginx:1.0 # =Juggernaut=
-    container_name: mapauto-nginx # =Juggernaut=
+    image: mapauto-microservices-nginx:2.0 # =Juggernaut= Updated for WAF security
+    container_name: mapauto-security-gateway # =Juggernaut= New name for production
     ports:
-      - "443:443" # =Juggernaut= HTTPS port for secure user access only
+      - "443:443" # =Juggernaut= ONLY HTTPS port exposed for maximum security
     restart: unless-stopped # =Juggernaut=
     depends_on:
       - frontend
@@ -139,16 +163,23 @@ services:
       - nmapall
       - osscan
       - portxmlparser
-    # =Juggernaut= Health check for nginx service
+      - waf_detection
+    # =Juggernaut= Enhanced health check for security gateway
     healthcheck:
-      test: ["CMD", "curl", "-f", "-k", "https://localhost"]
+      test: ["CMD", "curl", "-f", "-k", "https://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 45s
+    # =Juggernaut= Security environment variables
+    environment:
+      - NGINX_WORKER_PROCESSES=auto
+      - NGINX_WORKER_CONNECTIONS=1024
 
 # =Juggernaut= Added named volumes for data persistence
 volumes:
   nessus_data:
+    driver: local
+  waf_data:
     driver: local
     # =Juggernaut= No original code deleted, only enhanced frontend configuration
