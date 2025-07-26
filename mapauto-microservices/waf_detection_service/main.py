@@ -28,6 +28,7 @@ import logging
 import asyncio
 import ipaddress
 import subprocess
+import ssl
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 from urllib.parse import urlparse, urljoin
@@ -345,7 +346,8 @@ async def analyze_http_responses(target_url: str) -> Dict[str, Any]:
         "headers_analysis": {},
         "waf_indicators": [],
         "detected_waf": None,
-        "confidence": 0.0
+        "confidence": 0.0,
+        "waf_behavior_detected": False
     }
     
     # Ensure target has protocol
@@ -354,67 +356,128 @@ async def analyze_http_responses(target_url: str) -> Dict[str, Any]:
     
     try:
         # Get baseline response
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-            async with session.get(target_url) as response:
-                response_content = await response.text() if response.content_length and response.content_length < 1000000 else ""
-                analysis["baseline_response"] = {
-                    "status_code": response.status,
-                    "headers": dict(response.headers),
-                    "content": response_content[:1000]
-                }
-                
-                # Analyze headers for WAF indicators
-                headers = response.headers
-                for waf_type, signature in WAF_SIGNATURES.items():
-                    confidence = 0
-                    indicators = []
+        # Create SSL context that doesn't verify certificates for self-signed certs
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30),
+            connector=connector
+        ) as session:
+            # First try to get baseline response with a clean request
+            try:
+                async with session.get(target_url) as response:
+                    response_content = await response.text() if response.content_length and response.content_length < 1000000 else ""
+                    analysis["baseline_response"] = {
+                        "status_code": response.status,
+                        "headers": dict(response.headers),
+                        "content": response_content[:1000]
+                    }
                     
-                    # Check headers
-                    for header in signature.get("headers", []):
-                        if header.lower() in [h.lower() for h in headers.keys()]:
-                            confidence += 0.3
-                            indicators.append(f"Header: {header}")
-                    
-                    # Check server header
-                    server_header = headers.get("server", "").lower()
-                    for pattern in signature.get("server_patterns", []):
-                        if pattern.lower() in server_header:
-                            confidence += 0.4
-                            indicators.append(f"Server pattern: {pattern}")
-                    
-                    # Check response content
-                    content_lower = response_content.lower()
-                    for pattern in signature.get("content_patterns", []):
-                        if pattern.lower() in content_lower:
-                            confidence += 0.3
-                            indicators.append(f"Content pattern: {pattern}")
-                    
-                    if confidence > 0.5:
-                        analysis["waf_indicators"].append({
-                            "waf_type": waf_type,
-                            "waf_name": signature["name"],
-                            "confidence": confidence,
-                            "indicators": indicators
-                        })
-                
-                # Test with malicious payloads
-                for category, payloads in TEST_PAYLOADS.items():
-                    for i, payload in enumerate(payloads[:2]):  # Limit to 2 payloads per category
-                        test_url = f"{target_url}?test_{category}={payload}"
-                        try:
-                            async with session.get(test_url) as payload_response:
-                                analysis["payload_responses"][f"{category}_{i}"] = {
-                                    "payload": payload,
-                                    "status_code": payload_response.status,
-                                    "content_length": payload_response.content_length,
-                                    "blocked": payload_response.status in [403, 406, 503]
-                                }
-                        except Exception as e:
+                    # Analyze headers for WAF indicators
+                    headers = response.headers
+                    for waf_type, signature in WAF_SIGNATURES.items():
+                        confidence = 0
+                        indicators = []
+                        
+                        # Check headers
+                        for header in signature.get("headers", []):
+                            if header.lower() in [h.lower() for h in headers.keys()]:
+                                confidence += 0.3
+                                indicators.append(f"Header: {header}")
+                        
+                        # Check server header
+                        server_header = headers.get("server", "").lower()
+                        for pattern in signature.get("server_patterns", []):
+                            if pattern.lower() in server_header:
+                                confidence += 0.4
+                                indicators.append(f"Server pattern: {pattern}")
+                        
+                        # Check response content
+                        content_lower = response_content.lower()
+                        for pattern in signature.get("content_patterns", []):
+                            if pattern.lower() in content_lower:
+                                confidence += 0.3
+                                indicators.append(f"Content pattern: {pattern}")
+                        
+                        if confidence > 0.5:
+                            analysis["waf_indicators"].append({
+                                "waf_type": waf_type,
+                                "waf_name": signature["name"],
+                                "confidence": confidence,
+                                "indicators": indicators
+                            })
+            
+            except aiohttp.ClientResponseError as e:
+                if e.status == 403:
+                    # 403 on baseline request suggests aggressive WAF
+                    analysis["waf_behavior_detected"] = True
+                    analysis["baseline_response"] = {
+                        "status_code": 403,
+                        "headers": {},
+                        "content": "403 Forbidden - Likely WAF blocking",
+                        "waf_blocked": True
+                    }
+                else:
+                    raise e
+            
+            # Test with malicious payloads
+            blocked_payloads = 0
+            total_payloads = 0
+            
+            for category, payloads in TEST_PAYLOADS.items():
+                for i, payload in enumerate(payloads[:2]):  # Limit to 2 payloads per category
+                    total_payloads += 1
+                    test_url = f"{target_url}?test_{category}={payload}"
+                    try:
+                        async with session.get(test_url) as payload_response:
+                            blocked = payload_response.status in [403, 406, 503]
+                            if blocked:
+                                blocked_payloads += 1
+                                analysis["waf_behavior_detected"] = True
+                            
+                            analysis["payload_responses"][f"{category}_{i}"] = {
+                                "payload": payload,
+                                "status_code": payload_response.status,
+                                "content_length": payload_response.content_length,
+                                "blocked": blocked
+                            }
+                    except aiohttp.ClientResponseError as e:
+                        if e.status in [403, 406, 503]:
+                            blocked_payloads += 1
+                            analysis["waf_behavior_detected"] = True
+                            analysis["payload_responses"][f"{category}_{i}"] = {
+                                "payload": payload,
+                                "status_code": e.status,
+                                "blocked": True,
+                                "waf_response": True
+                            }
+                        else:
                             analysis["payload_responses"][f"{category}_{i}"] = {
                                 "payload": payload,
                                 "error": str(e),
                                 "blocked": True
                             }
+                    except Exception as e:
+                        analysis["payload_responses"][f"{category}_{i}"] = {
+                            "payload": payload,
+                            "error": str(e),
+                            "blocked": True
+                        }
+            
+            # Calculate WAF confidence based on blocked payloads
+            if total_payloads > 0:
+                block_ratio = blocked_payloads / total_payloads
+                if block_ratio >= 0.7:  # 70% or more payloads blocked
+                    analysis["confidence"] = 0.9
+                    analysis["detected_waf"] = "generic_waf"
+                    analysis["waf_behavior_detected"] = True
+                elif block_ratio >= 0.5:  # 50-69% payloads blocked
+                    analysis["confidence"] = 0.7
+                    analysis["detected_waf"] = "possible_waf"
+                    analysis["waf_behavior_detected"] = True
                 
     except Exception as e:
         analysis["error"] = str(e)
@@ -463,14 +526,27 @@ async def detect_waf(
         http_analysis = await analyze_http_responses(target)
         result.response_analysis = http_analysis
         
-        if http_analysis.get("detected_waf"):
+        if http_analysis.get("detected_waf") or http_analysis.get("waf_behavior_detected"):
             result.waf_detected = True
-            result.waf_type = http_analysis["detected_waf"]
-            result.confidence_level = http_analysis["confidence"]
+            result.waf_type = http_analysis.get("detected_waf", "generic_waf")
+            result.confidence_level = http_analysis.get("confidence", 0.8)
             result.detection_methods.append("HTTP Response Analysis")
             
-            # Get WAF signature details
-            if result.waf_type in WAF_SIGNATURES:
+            # Determine WAF type based on detection
+            if result.waf_type == "generic_waf":
+                result.waf_name = "Generic WAF (Behavior-based detection)"
+                result.weaknesses = [
+                    "May have bypass techniques via encoding",
+                    "Could be vulnerable to request method variations",
+                    "Possible rate limiting bypass opportunities"
+                ]
+                result.bypass_techniques = [
+                    "Try different HTTP methods (POST, PUT, PATCH)",
+                    "Use URL encoding variations",
+                    "Fragment payloads across parameters",
+                    "Use case variations in payloads"
+                ]
+            elif result.waf_type in WAF_SIGNATURES:
                 waf_info = WAF_SIGNATURES[result.waf_type]
                 result.waf_name = waf_info["name"]
                 result.weaknesses = waf_info.get("weaknesses", [])
